@@ -1,12 +1,23 @@
 <template>
-  <div class="p-4 relative">
-    <div class="flex flx-col md:flex-row justify-between mb-4 items-center gap-4">
-      <input
-        v-model="search"
-        type="text"
-        placeholder="Search product..."
-        class="border rounded px-2 py-1 w-full max-w-sm"
-      />
+  <div class="relative p-4">
+    <div class="flex flex-col items-center justify-between gap-4 mb-4 md:flex-row">
+      <div class="flex items-center w-full max-w-xl gap-4">
+        <input
+          v-model="search"
+          type="text"
+          placeholder="Search product..."
+          class="w-full px-2 py-1 border rounded"
+        />
+
+        <!-- Page size selector -->
+        <div class="flex items-center gap-2">
+          <label class="text-sm">Show</label>
+          <select v-model.number="pageSize" class="px-2 py-1 text-sm border rounded">
+            <option v-for="n in pageSizeOptions" :key="n" :value="n">{{ n }}</option>
+          </select>
+          <span class="text-sm">per page</span>
+        </div>
+      </div>
 
       <div class="flex items-center ml-4 space-x-3">
         <div class="font-semibold">Cart: {{ cart.length }}</div>
@@ -15,7 +26,7 @@
           🛒
           <span
             v-if="cart.length > 0"
-            class="absolute -top-2 -right-2 bg-red-500 text-white rounded-full text-xs px-1"
+            class="absolute px-1 text-xs text-white bg-red-500 rounded-full -top-2 -right-2"
           >
             {{ cart.length }}
           </span>
@@ -23,37 +34,50 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
       <ProductCard
-        v-for="product in filteredProducts"
+        v-for="product in pagedProducts"
         :key="product.id"
         :product="product"
         @add-to-cart="addToCart"
       />
     </div>
 
+    <!-- Pagination and summary -->
+    <div class="flex items-center justify-between mt-4">
+      <div class="text-sm text-gray-600">
+        Showing {{ showingStart }} to {{ showingEnd }} of {{ totalFiltered }} entries
+      </div>
+
+      <Pagination
+        :total-pages="totalPages"
+        :current-page="currentPage"
+        @update:current-page="(p) => (currentPage = p)"
+      />
+    </div>
+
     <div
       v-if="showCart"
-      class="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-4"
+      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-40"
     >
-      <div class="bg-white rounded-lg shadow-lg w-full max-w-md p-4 relative">
-        <div class="flex justify-between items-start">
-          <h2 class="text-xl font-bold mb-3">🛍️ Your Cart</h2>
+      <div class="relative w-full max-w-md p-4 bg-white rounded-lg shadow-lg">
+        <div class="flex items-start justify-between">
+          <h2 class="mb-3 text-xl font-bold">🛍️ Your Cart</h2>
           <button @click="closeCart" class="text-gray-500 hover:text-gray-800">✕</button>
         </div>
 
-        <div v-if="cart.length === 0" class="text-gray-500 text-center py-10">
+        <div v-if="cart.length === 0" class="py-10 text-center text-gray-500">
           Cart is empty.
         </div>
 
-        <div v-else class="max-h-64 overflow-y-auto border-t border-b py-2 space-y-2">
+        <div v-else class="py-2 space-y-2 overflow-y-auto border-t border-b max-h-64">
           <div
             v-for="(item, index) in visibleCartItems"
             :key="index"
-            class="flex justify-between items-center py-1"
+            class="flex items-center justify-between py-1"
           >
             <div class="flex items-center gap-3">
-              <img :src="item.image" alt="" class="w-10 h-10 object-contain" />
+              <img :src="item.image" alt="" class="object-contain w-10 h-10" />
               <div class="text-sm">
                 <div class="font-medium">{{ truncate(item.title, 40) }}</div>
                 <div class="text-xs text-gray-500">Qty: {{ item.quantity || 1 }}</div>
@@ -63,7 +87,7 @@
             <div class="text-sm">Rp {{ item.convertedPrice.toLocaleString() }}</div>
           </div>
 
-          <div v-if="cart.length > 7" class="text-center text-sm text-gray-500 mt-2">
+          <div v-if="cart.length > 7" class="mt-2 text-sm text-center text-gray-500">
             Showing first 7 items — scroll to see more.
           </div>
         </div>
@@ -75,36 +99,36 @@
           </label>
 
           <div class="flex items-center gap-2">
-            <select v-model="promoSelected" class="border rounded px-2 py-1 text-sm">
+            <select v-model="promoSelected" class="px-2 py-1 text-sm border rounded">
               <option value="">No Promo</option>
               <option value="DISKON20">DISKON20 (-20%)</option>
             </select>
-           
+
             <input
               v-model="promoInput"
               @input="promoSelected = promoInput.trim()"
               placeholder="Or enter promo code"
-              class="border rounded px-2 py-1 text-sm flex-1"
+              class="flex-1 px-2 py-1 text-sm border rounded"
             />
           </div>
         </div>
 
-        <div class="mt-3 border-t pt-2 text-sm space-y-1">
+        <div class="pt-2 mt-3 space-y-1 text-sm border-t">
           <div>Total Harga: <strong>Rp {{ totalPrice.toLocaleString() }}</strong></div>
           <div>Diskon: <strong>{{ discountInfo.discount }}%</strong></div>
           <div>Total Bayar: <strong>Rp {{ discountInfo.finalPrice.toLocaleString() }}</strong></div>
         </div>
 
-        <div class="flex justify-between items-center mt-3">
+        <div class="flex items-center justify-between mt-3">
           <div class="text-xs text-gray-500">
             (Conversion used: 1 USD ≈ {{ currencyRate.toLocaleString() }} IDR)
           </div>
 
           <div class="flex gap-2">
-            <button @click="clearCart" class="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 text-sm">
+            <button @click="clearCart" class="px-3 py-1 text-sm text-white bg-red-500 rounded hover:bg-red-600">
               Clear
             </button>
-            <button @click="closeCart" class="bg-gray-200 px-3 py-1 rounded hover:bg-gray-300 text-sm">
+            <button @click="closeCart" class="px-3 py-1 text-sm bg-gray-200 rounded hover:bg-gray-300">
               Close
             </button>
           </div>
@@ -117,20 +141,26 @@
 <script>
 import { ref, computed, onMounted, watch } from 'vue'
 import ProductCard from '../components/ProductCard.vue'
+import Pagination from '../components/Pagination.vue'
 import { calculateDiscount } from '../utils/discount'
 
 export default {
-  components: { ProductCard },
+  components: { ProductCard, Pagination },
   setup() {
     const products = ref([])
     const search = ref('')
     const cart = ref([])
     const showCart = ref(false)
-   
+
     const isMember = ref(false)
-    const promoSelected = ref('') 
-    const promoInput = ref('') 
-    const currencyRate = ref(16000) 
+    const promoSelected = ref('')
+    const promoInput = ref('')
+    const currencyRate = ref(16000)
+
+    // Pagination state
+    const pageSizeOptions = [5, 10, 15, 20, 50]
+    const pageSize = ref(10)
+    const currentPage = ref(1)
 
     const convertToRupiah = (usd) => Math.round(usd * currencyRate.value)
 
@@ -148,9 +178,7 @@ export default {
         id: product.id,
         title: product.title,
         image: product.image,
-        
         convertedPrice: convertToRupiah(product.price),
-        
         quantity: 1,
       }
       cart.value.push(convertedProduct)
@@ -161,6 +189,25 @@ export default {
       return products.value.filter((p) =>
         p.title.toLowerCase().includes(search.value.toLowerCase())
       )
+    })
+
+    // total after filtering
+    const totalFiltered = computed(() => filteredProducts.value.length)
+
+    // total pages
+    const totalPages = computed(() =>
+      Math.max(1, Math.ceil(totalFiltered.value / pageSize.value))
+    )
+
+    // Ensure currentPage stays valid when filters/pageSize change
+    watch([pageSize, filteredProducts], () => {
+      if (currentPage.value > totalPages.value) currentPage.value = totalPages.value
+      if (currentPage.value < 1) currentPage.value = 1
+    })
+
+    const pagedProducts = computed(() => {
+      const start = (currentPage.value - 1) * pageSize.value
+      return filteredProducts.value.slice(start, start + pageSize.value)
     })
 
     const totalPrice = computed(() =>
@@ -189,8 +236,17 @@ export default {
     const visibleCartItems = computed(() => {
       return cart.value.slice(0, 7).map((it) => it)
     })
-	
+
     const truncate = (str, n = 40) => (str.length > n ? str.slice(0, n) + '...' : str)
+
+    // Showing X to Y of Z entries
+    const showingStart = computed(() => {
+      if (totalFiltered.value === 0) return 0
+      return (currentPage.value - 1) * pageSize.value + 1
+    })
+    const showingEnd = computed(() =>
+      Math.min(totalFiltered.value, currentPage.value * pageSize.value)
+    )
 
     onMounted(fetchProducts)
 
@@ -200,7 +256,7 @@ export default {
       cart,
       showCart,
       addToCart,
-      filteredProducts,
+      pagedProducts,
       totalPrice,
       discountInfo,
       openCart,
@@ -212,10 +268,20 @@ export default {
       promoSelected,
       promoInput,
       currencyRate,
+
+      // pagination
+      pageSizeOptions,
+      pageSize,
+      currentPage,
+      totalPages,
+      totalFiltered,
+      showingStart,
+      showingEnd,
     }
   },
 }
 </script>
 
 <style scoped>
+/* nothing special */
 </style>
