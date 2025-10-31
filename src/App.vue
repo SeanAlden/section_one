@@ -1,5 +1,11 @@
 <template>
   <div class="min-h-screen bg-gray-50">
+    <div
+      v-if="!isCollapsed"
+      @click="toggleSidebar"
+      class="fixed inset-0 z-30 bg-black/50 lg:hidden"
+      aria-hidden="true"
+    ></div>
     <Sidebar
       :is-collapsed="isCollapsed"
       :categories="categories"
@@ -7,25 +13,25 @@
       :toggle-icon="toggleIcon"
       @toggle-sidebar="toggleSidebar"
     />
-
     <Header
-      :header-padding-left="headerPaddingLeft"
       :notification="notification"
       :profile="profile"
-    />
-
-    <main
-      :style="{ marginLeft: mainMarginLeft, paddingTop: headerHeight }"
+      @toggle-sidebar="toggleSidebar"
       class="transition-all duration-300"
+      :class="[isCollapsed ? 'lg:pl-16' : 'lg:pl-64']"
+    />
+    <main
+      :style="{ paddingTop: headerHeight }"
+      class="transition-all duration-300"
+      :class="[isCollapsed ? 'lg:ml-16' : 'lg:ml-64']"
     >
-      <div class="p-6 mx-auto max-w-7xl">
+      <div class="mx-auto max-w-7xl p-6">
         <ProductList />
       </div>
     </main>
-
     <footer
-      :style="{ marginLeft: mainMarginLeft }"
-      class="p-6 mt-8 text-sm text-center text-gray-500"
+      class="mt-8 p-6 text-center text-sm text-gray-500 transition-all duration-300"
+      :class="[isCollapsed ? 'lg:ml-16' : 'lg:ml-64']"
     >
       &copy; 2025 My Store. All rights reserved.
     </footer>
@@ -33,10 +39,10 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
-// Impor komponen anak
-import Sidebar from './components/Sidebar.vue' 
-import Header from './components/Header.vue' 
+// 1. Impor 'onMounted' dan 'onUnmounted' dari vue
+import { ref, onMounted, onUnmounted } from 'vue' 
+import Sidebar from './components/Sidebar.vue'
+import Header from './components/Header.vue'
 import ProductList from './views/ProductList.vue'
 
 import profile from '/src/assets/profile.png'
@@ -48,32 +54,52 @@ export default {
   name: 'App',
   components: {
     ProductList,
-    Sidebar, 
-    Header, 
+    Sidebar,
+    Header,
   },
   setup() {
-    // --- State Utama (Tetap di App.vue) ---
-    const isCollapsed = ref(false)
+    const isInitiallyMobile = window.innerWidth < 1024
+    const isCollapsed = ref(isInitiallyMobile)
+
     const toggleSidebar = () => {
       isCollapsed.value = !isCollapsed.value
     }
 
-    // --- Data (Tetap di App.vue untuk dikirim sebagai props) ---
     const categories = ['Electronics', 'Clothing', 'Books', 'Toys']
-    const headerHeight = '64px' // 16 * 4 (Tailwind h-16 is 4rem = 64px)
+    const headerHeight = '64px'
 
-    // --- Computed Properties (Tergantung state) ---
-    const mainMarginLeft = computed(() => (isCollapsed.value ? '4rem' : '16rem')) // w-16 = 4rem, w-64 = 16rem
-    const headerPaddingLeft = computed(() => (isCollapsed.value ? '4rem' : '16rem'))
+    // --- PERBAIKAN DIMULAI DI SINI ---
+
+    // 2. Buat fungsi handler
+    // Fungsi ini akan dipanggil setiap kali jendela di-resize
+    const handleResize = () => {
+      // Periksa apakah kita di 'mobile' (lebar < 1024)
+      // DAN sidebar sedang 'terbuka' (!isCollapsed)
+      if (window.innerWidth < 1024 && !isCollapsed.value) {
+        // Jika ya, paksa sidebar untuk menutup.
+        // Ini adalah logika yang Anda minta.
+        isCollapsed.value = true
+      }
+    }
+
+    // 3. Pasang listener saat komponen di-mount (dimuat)
+    onMounted(() => {
+      window.addEventListener('resize', handleResize)
+    })
+
+    // 4. Hapus listener saat komponen di-unmount (dihancurkan)
+    // Ini penting untuk mencegah kebocoran memori (memory leaks)
+    onUnmounted(() => {
+      window.removeEventListener('resize', handleResize)
+    })
+    
+    // --- AKHIR PERBAIKAN ---
 
     return {
       isCollapsed,
       toggleSidebar,
-      mainMarginLeft,
-      headerPaddingLeft,
       headerHeight,
       categories,
-      // Aset untuk dikirim sebagai props
       profile,
       notification,
       storeLogo,
@@ -85,9 +111,8 @@ export default {
 
 <style scoped>
 main {
-  min-height: calc(100vh - 64px - 48px); /* header + footer approx */
+  min-height: calc(100vh - 64px - 48px);
 }
-
 :root {
   scroll-padding-top: 80px;
 }
